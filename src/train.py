@@ -1,13 +1,20 @@
 from torch.utils.data import DataLoader
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from models.risk_predictor import RiskPredictor
-from utils.data_preparation import HealthDataset, load_and_preprocess_data
+from src.utils.preprocessing import HealthDataset, load_and_preprocess_data
 
 
 def train_model(
-    data_path, features, label, num_epochs=20, batch_size=32, learning_rate=0.001
+    data_path,
+    features,
+    label,
+    num_epochs=20,
+    batch_size=32,
+    learning_rate=0.001,
+    model_save_path="models/risk_predictor.pth",
 ):
     # Check for GPU (ROCm)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,7 +68,12 @@ def train_model(
 
         val_loss /= len(val_loader)
         print(
-            f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss.item()}, Val Loss: {val_loss}"
+            f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss:.6f}"
         )
+
+    # Save the trained model
+    os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Model saved to {model_save_path}")
 
     return model, X_test, y_test

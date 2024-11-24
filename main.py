@@ -1,10 +1,13 @@
+import argparse
+import pandas as pd
+import torch
+from models.risk_predictor import RiskPredictor
 from src.train import train_model
 from src.evaluate import evaluate_model
-from utils.data_preparation import HealthDataset
-from torch.utils.data import DataLoader
+from src.predict import predict_random_samples
+from src.utils.preprocessing import load_and_preprocess_data
 
-# Configurations
-DATA_PATH = "data/human_vital_signs_dataset_2024.csv"
+# Feature and label definitions
 FEATURES = [
     "Heart Rate",
     "Respiratory Rate",
@@ -22,17 +25,63 @@ FEATURES = [
 ]
 LABEL = "Risk Category"
 
-# Train the model
-model, X_test, y_test = train_model(DATA_PATH, FEATURES, LABEL)
 
-# Prepare the test loader
-test_dataset = HealthDataset(X_test, y_test)
-test_loader = DataLoader(
-    test_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True
-)
+def main():
+    parser = argparse.ArgumentParser(description="Healthcare Risk Prediction")
+    parser.add_argument("--train", action="store_true", help="Train the model.")
+    parser.add_argument(
+        "--predict", action="store_true", help="Predict random samples."
+    )
+    parser.add_argument("--data", type=str, required=True, help="Path to the dataset.")
+    parser.add_argument(
+        "--model", type=str, required=True, help="Path to save/load the model."
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=20, help="Number of training epochs."
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=32, help="Batch size for training."
+    )
+    parser.add_argument(
+        "--learning_rate", type=float, default=0.001, help="Learning rate."
+    )
+    parser.add_argument(
+        "--num_samples",
+        type=int,
+        default=10,
+        help="Number of random samples for prediction.",
+    )
+    args = parser.parse_args()
 
-# Evaluate the model on the test set
-acc, precision, recall, f1 = evaluate_model(model, test_loader)
-print(
-    f"Test Accuracy: {acc:.2f}, Precision: {precision:.2f}, Recall: {recall:.2f}, F1-Score: {f1:.2f}"
-)
+    # Load dataset
+    df = pd.read_csv(args.data)
+
+    if args.train:
+        print("Training the model...")
+        model, X_test, y_test = train_model(
+            data_path=args.data,
+            features=FEATURES,
+            label=LABEL,
+            num_epochs=args.epochs,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate,
+            model_save_path=args.model,
+        )
+        print("Model training complete.")
+
+        evaluate_model(model, X_test, y_test)
+
+    elif args.predict:
+        print("Loading the model for prediction...")
+        model = RiskPredictor(input_size=len(FEATURES))
+        model.load_state_dict(torch.load(args.model))
+
+        print("Predicting random samples from the dataset...")
+        predictions = predict_random_samples(model, df, FEATURES, args.num_samples)
+
+    else:
+        print("Please specify either --train or --predict.")
+
+
+if __name__ == "__main__":
+    main()
