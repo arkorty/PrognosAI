@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class RiskPredictor(nn.Module):
     def __init__(self, input_size):
         super(RiskPredictor, self).__init__()
