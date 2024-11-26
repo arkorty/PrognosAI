@@ -1,50 +1,93 @@
 from tabulate import tabulate
 from colorama import Fore, Style
+from src.util.preprocess.pressure import preprocess_data
+from src.model.ffnn import FFNNModel
+from src.model.rnn import RNNModel
 import torch
 import random
 
 
-def get_advice(vitals, prediction):
+def predict_pressure(model, data_path, samples=10):
     """
-    Generate advice based on vital signs and prediction.
+    Predict using the trained RNN model and display results in a tabular format.
+
+    Args:
+        model_path (str): Path to the saved RNN model.
+        data_path (str): Path to the dataset CSV file.
+        samples (int, optional): Number of random samples to display. Default: 10.
+
+    Returns:
+        None
     """
-    advice = []
-    if prediction == "High Risk":
-        advice.append("Immediate medical attention is recommended.")
+    import random
 
-    if vitals["Heart Rate"] > 100:
-        advice.append("Heart rate is high; consider resting and monitoring.")
-    elif vitals["Heart Rate"] < 60:
-        advice.append("Heart rate is low; consult a cardiologist if persistent.")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if vitals["Body Temperature"] > 37.5:
-        advice.append("High body temperature detected; monitor for fever.")
-    elif vitals["Body Temperature"] < 36:
-        advice.append("Low body temperature detected; check for hypothermia.")
+    # Preprocess data
+    _, _, X_test_tensor, y_test_tensor, input_size = preprocess_data(data_path, device)
 
-    if vitals["Oxygen Saturation"] < 94:
-        advice.append("Low oxygen saturation; consider oxygen therapy.")
+    # Initialize and load the model
+    hidden_size = 64  # Same hidden size used during training
+    rnn = RNNModel(input_size=input_size, hidden_size=hidden_size, output_size=1)
+    rnn.load_state_dict(torch.load(model))
+    rnn.to(device)
+    rnn.eval()
 
-    return " ".join(advice) if advice else "Vitals are within normal ranges."
+    # Randomly sample from test data
+    random_indices = random.sample(range(len(X_test_tensor)), samples)
+    random_X = X_test_tensor[random_indices]
+    random_y_true = y_test_tensor[random_indices]
+
+    with torch.no_grad():
+        random_y_pred = rnn(random_X).cpu().numpy()
+
+    random_y_true = random_y_true.cpu().numpy()
+
+    # Prepare and display the table
+    table_data = []
+    for i in range(samples):
+        sample_id = random_indices[i]
+        cpressure = random_y_true[i][0]  # Current pressure
+        rpressure = random_y_pred[i][0]  # Recommended pressure
+        dpressure = rpressure - cpressure  # Desired differential
+
+        # Color coding for differential
+        if dpressure > 0:
+            dpressure_colored = f"{Fore.BLUE}{dpressure:.2f}{Style.RESET_ALL}"
+        else:
+            dpressure_colored = f"{Fore.RED}{dpressure:.2f}{Style.RESET_ALL}"
+
+        table_data.append([sample_id, f"{cpressure:.2f}", dpressure_colored])
+
+    headers = ["Sample ID", "Current Pressure", "Desired Differential"]
+    print(
+        tabulate(table_data, headers=headers, tablefmt="fancy_grid", showindex="always")
+    )
 
 
-def predict_random_samples(model, dataset, features, num_samples=10):
+def predict_risk(model, dataset, features, samples=10):
     """
-    Predict risk categories for random samples from the dataset and display results with advice.
+    Predict risk categories for random samples from the dataset and display results.
 
     Parameters:
     - model: Trained PyTorch model.
     - dataset: DataFrame containing the features.
     - features: List of feature column names.
-    - num_samples: Number of random samples to predict.
+    - samples: Number of random samples to predict.
     """
     # Check for GPU (ROCm or CUDA)
+
+    ffnn = FFNNModel(input_size=len(features))
+    ffnn.load_state_dict(torch.load(model, weights_only=True))
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    model.eval()
+    print(f"Using {'GPU' if torch.cuda.is_available() else 'CPU'}.")
+
+    ffnn = ffnn.to(device)
+    ffnn.eval()
 
     # Select random samples
-    sampled_data = dataset.sample(num_samples)
+    sampled_data = dataset.sample(samples)
 
     results = []
     with torch.no_grad():
@@ -55,14 +98,13 @@ def predict_random_samples(model, dataset, features, num_samples=10):
 
             # Convert to tensor and move to GPU
             data_point_tensor = torch.tensor(data_point, dtype=torch.float32).to(device)
-            output = model(data_point_tensor).squeeze().item()
+            output = ffnn(data_point_tensor).squeeze().item()
             prediction = "High Risk" if output > 0.5 else "Low Risk"
             actual = row["Risk Category"]
 
-            # Add colored status
+            # Determine the colors for prediction and actual values
             pred_color = Fore.RED if prediction == "High Risk" else Fore.GREEN
             actual_color = Fore.RED if actual == "High Risk" else Fore.GREEN
-            advice = get_advice(vitals, prediction)
 
             # Store the results in a structured format for tabulation
             results.append(
@@ -73,23 +115,14 @@ def predict_random_samples(model, dataset, features, num_samples=10):
                     "Oxygen": vitals["Oxygen Saturation"],
                     "Prediction": f"{pred_color}{prediction}{Style.RESET_ALL}",
                     "Actual": f"{actual_color}{actual}{Style.RESET_ALL}",
-                    "Advice": advice,
                 }
             )
 
     # Define headers for the table
-    headers = [
-        "Heart Rate",
-        "Resp Rate",
-        "Temp",
-        "Oxygen",
-        "Prediction",
-        "Actual",
-        "Advice",
-    ]
+    headers = ["Heart Rate", "Resp Rate", "Temp", "Oxygen", "Prediction", "Actual"]
 
     # Convert results to list of lists for tabulate
-    tabular_data = [
+    table_data = [
         [
             row["Heart Rate"],
             row["Resp Rate"],
@@ -97,14 +130,11 @@ def predict_random_samples(model, dataset, features, num_samples=10):
             row["Oxygen"],
             row["Prediction"],
             row["Actual"],
-            row["Advice"],
         ]
         for row in results
     ]
 
     # Print the formatted table
     print(
-        tabulate(
-            tabular_data, headers=headers, tablefmt="fancy_grid", showindex="always"
-        )
+        tabulate(table_data, headers=headers, tablefmt="fancy_grid", showindex="always")
     )

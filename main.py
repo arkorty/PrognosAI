@@ -1,11 +1,18 @@
+#!/usr/bin/env python
+
+
 import argparse
 import pandas as pd
 import torch
-from models.risk_predictor import RiskPredictor
-from src.train import train_model
-from src.evaluate import evaluate_model
-from src.predict import predict_random_samples
-from src.utils.preprocessing import load_and_preprocess_data
+import sys
+from src.train import train_ffnn
+from src.train import train_rnn
+from src.model.ffnn import FFNNModel
+from src.predict import predict_risk
+from src.predict import predict_pressure
+from src.util.evaluate import evaluate_ffnn
+from src.util.visualize import visualize_data
+from src.util.visualize import visualize_ffnn
 
 # Feature and label definitions
 FEATURES = [
@@ -28,59 +35,96 @@ LABEL = "Risk Category"
 
 def main():
     parser = argparse.ArgumentParser(description="Healthcare Risk Prediction")
-    parser.add_argument("--train", action="store_true", help="Train the model.")
     parser.add_argument(
-        "--predict", action="store_true", help="Predict random samples."
+        "--visualize", action="store_true", help="Visualize the dataset."
     )
-    parser.add_argument("--data", type=str, required=True, help="Path to the dataset.")
+    parser.add_argument("--train", type=str, help="Train the model.")
+    parser.add_argument("--predict", type=str, help="Predict random samples.")
     parser.add_argument(
-        "--model", type=str, required=True, help="Path to save/load the model."
+        "--save",
+        type=str,
+        required="--visualize" in sys.argv
+        or ("--train" in sys.argv and "ffnn" in sys.argv),
+        help="Path to save directory.",
+    )
+    parser.add_argument(
+        "--data",
+        type=str,
+        required="--visualize" in sys.argv
+        or "--train" in sys.argv
+        or "--predict" in sys.argv,
+        help="Path to the dataset.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required="--train" in sys.argv or "--predict" in sys.argv,
+        help="Path to save/load the model.",
     )
     parser.add_argument(
         "--epochs", type=int, default=20, help="Number of training epochs."
     )
     parser.add_argument(
-        "--batch_size", type=int, default=32, help="Batch size for training."
+        "--bsize", type=int, default=32, help="Batch size for training."
     )
     parser.add_argument(
-        "--learning_rate", type=float, default=0.001, help="Learning rate."
+        "--hsize",
+        type=int,
+        default=64,
+        help="Hidden size for RNN model.",
     )
+    parser.add_argument("--lrate", type=float, default=0.001, help="Learning rate.")
     parser.add_argument(
-        "--num_samples",
+        "--samples",
         type=int,
         default=10,
         help="Number of random samples for prediction.",
     )
     args = parser.parse_args()
 
-    # Load dataset
     df = pd.read_csv(args.data)
 
-    if args.train:
-        print("Training the model...")
-        model, X_test, y_test = train_model(
-            data_path=args.data,
-            features=FEATURES,
-            label=LABEL,
-            num_epochs=args.epochs,
-            batch_size=args.batch_size,
-            learning_rate=args.learning_rate,
-            model_save_path=args.model,
-        )
-        print("Model training complete.")
+    if args.visualize:
+        visualize_data(args.data, FEATURES, LABEL, args.save)
+        return
 
-        evaluate_model(model, X_test, y_test)
+    elif args.train:
+        if "ffnn" in args.train:
+            print("Training the model...")
+            model, X_test, y_test = train_ffnn(
+                data_path=args.data,
+                features=FEATURES,
+                label=LABEL,
+                num_epochs=args.epochs,
+                batch_size=args.bsize,
+                learning_rate=args.lrate,
+                model_save_path=args.model,
+            )
+            print("Model training complete.")
+            conf_matrix, fpr, tpr, roc_auc = evaluate_ffnn(model, X_test, y_test)
+            visualize_ffnn(conf_matrix, fpr, tpr, roc_auc, args.save)
+
+        if "rnn" in args.train:
+            train_rnn(
+                data_path=args.data,
+                model_path=args.model,
+                num_epochs=args.epochs,
+                batch_size=args.bsize,
+                learning_rate=args.lrate,
+            )
 
     elif args.predict:
-        print("Loading the model for prediction...")
-        model = RiskPredictor(input_size=len(FEATURES))
-        model.load_state_dict(torch.load(args.model))
+        if "ffnn" in args.predict:
+            predict_risk(args.model, df, FEATURES, args.samples)
 
-        print("Predicting random samples from the dataset...")
-        predictions = predict_random_samples(model, df, FEATURES, args.num_samples)
-
+        if args.predict and "rnn" in args.predict:
+            predict_pressure(
+                model=args.model,
+                data_path=args.data,
+                samples=args.samples,
+            )
     else:
-        print("Please specify either --train or --predict.")
+        print("Please specify --train, --predict, or --visualize.")
 
 
 if __name__ == "__main__":
