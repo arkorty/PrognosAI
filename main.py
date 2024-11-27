@@ -37,7 +37,7 @@ def main():
     parser.add_argument(
         "--save",
         type=str,
-        required="--visualize" in sys.argv or ("--train" in sys.argv and "ffnn" in sys.argv),
+        required="--visualize" in sys.argv,
         help="Path to save directory.",
     )
     parser.add_argument(
@@ -88,8 +88,11 @@ def main():
                 model_save_path=args.model,
             )
             print("Model training complete.")
+
             conf_matrix, fpr, tpr, roc_auc = evaluate_ffnn(model, X_test, y_test)
-            visualize_ffnn(conf_matrix, fpr, tpr, roc_auc, args.save)
+
+            if args.save is not None:
+                visualize_ffnn(conf_matrix, fpr, tpr, roc_auc, args.save)
 
         if "rnn" in args.train:
             train_rnn(
