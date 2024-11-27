@@ -16,24 +16,14 @@ class HealthDataset(torch.utils.data.Dataset):
 
 
 def load_dataset(data_path, features, label, test_size=0.2, val_size=0.1):
-    # Load the dataset
     data = pd.read_csv(data_path)
 
-    # Preprocess features and labels
     X = data[features].values
-    y = (
-        (data[label] == "High Risk").astype(float).values
-    )  # Binary encoding for risk category
+    y = (data[label] == "High Risk").astype(float).values
 
-    # First split into train+val and test
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=42
-    )
+    X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
 
-    # Further split train+val into train and validation
-    val_ratio = val_size / (1 - test_size)  # Adjust val size to remaining train+val set
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val, y_train_val, test_size=val_ratio, random_state=42
-    )
+    val_ratio = val_size / (1 - test_size)
+    X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=val_ratio, random_state=42)
 
     return X_train, X_val, X_test, y_train, y_val, y_test

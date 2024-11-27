@@ -10,6 +10,6 @@ class RNNModel(nn.Module):
 
     def forward(self, x):
         out, _ = self.rnn(x)
-        out = out[:, -1, :]  # Get the last output for each sequence
+        out = out[:, -1, :]
         out = self.fc(out)
         return out

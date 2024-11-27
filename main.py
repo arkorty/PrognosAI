@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-
-
 import argparse
 import pandas as pd
 import torch
@@ -14,7 +11,6 @@ from src.util.evaluate import evaluate_ffnn
 from src.util.visualize import visualize_data
 from src.util.visualize import visualize_ffnn
 
-# Feature and label definitions
 FEATURES = [
     "Heart Rate",
     "Respiratory Rate",
@@ -35,24 +31,19 @@ LABEL = "Risk Category"
 
 def main():
     parser = argparse.ArgumentParser(description="Healthcare Risk Prediction")
-    parser.add_argument(
-        "--visualize", action="store_true", help="Visualize the dataset."
-    )
+    parser.add_argument("--visualize", action="store_true", help="Visualize the dataset.")
     parser.add_argument("--train", type=str, help="Train the model.")
     parser.add_argument("--predict", type=str, help="Predict random samples.")
     parser.add_argument(
         "--save",
         type=str,
-        required="--visualize" in sys.argv
-        or ("--train" in sys.argv and "ffnn" in sys.argv),
+        required="--visualize" in sys.argv or ("--train" in sys.argv and "ffnn" in sys.argv),
         help="Path to save directory.",
     )
     parser.add_argument(
         "--data",
         type=str,
-        required="--visualize" in sys.argv
-        or "--train" in sys.argv
-        or "--predict" in sys.argv,
+        required="--visualize" in sys.argv or "--train" in sys.argv or "--predict" in sys.argv,
         help="Path to the dataset.",
     )
     parser.add_argument(
@@ -61,12 +52,8 @@ def main():
         required="--train" in sys.argv or "--predict" in sys.argv,
         help="Path to save/load the model.",
     )
-    parser.add_argument(
-        "--epochs", type=int, default=20, help="Number of training epochs."
-    )
-    parser.add_argument(
-        "--bsize", type=int, default=32, help="Batch size for training."
-    )
+    parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs.")
+    parser.add_argument("--bsize", type=int, default=32, help="Batch size for training.")
     parser.add_argument(
         "--hsize",
         type=int,

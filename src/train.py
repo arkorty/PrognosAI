@@ -22,27 +22,10 @@ def train_rnn(
     hidden_size=64,
     device=None,
 ):
-    """
-    Train an RNN model for ventilator pressure prediction.
-
-    Args:
-        data_path (str): Path to the CSV dataset.
-        model_path (str): Path to save the trained model.
-        num_epochs (int): Number of training epochs.
-        batch_size (int): Batch size for training.
-        learning_rate (float): Learning rate for the optimizer.
-        hidden_size (int): Number of hidden units in the RNN model.
-        device (torch.device): Device to use for training. Default: auto-detect.
-
-    Returns:
-        None
-    """
-    # Set device
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Load and preprocess the dataset
     vital_signs_df = pd.read_csv(data_path)
 
     vital_signs_df = vital_signs_df.rename(
@@ -56,7 +39,6 @@ def train_rnn(
         }
     )
 
-    # Add synthetic 'VentilatorPressure' column for demonstration
     if "VentilatorPressure" not in vital_signs_df.columns:
         np.random.seed(42)
         vital_signs_df["VentilatorPressure"] = (
@@ -67,7 +49,6 @@ def train_rnn(
             + np.random.normal(0, 5, len(vital_signs_df))
         )
 
-    # Define features and target
     features = [
         "HeartRate",
         "RespiratoryRate",
@@ -82,36 +63,27 @@ def train_rnn(
     X = vital_signs_df[features].values
     y = vital_signs_df[target].values
 
-    # Split dataset
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Standardize the data
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    # Reshape for RNN input
     X_train = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
 
-    # Convert to tensors
     X_train_tensor = torch.tensor(X_train, dtype=torch.float32).to(device)
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32).view(-1, 1).to(device)
 
     train_data = TensorDataset(X_train_tensor, y_train_tensor)
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 
-    # Initialize the model
     input_size = X_train.shape[2]
     output_size = 1
     model = RNNModel(input_size, hidden_size, output_size).to(device)
 
-    # Define loss and optimizer
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Train the model
     for epoch in range(num_epochs):
         model.train()
         epoch_loss = 0
@@ -123,11 +95,8 @@ def train_rnn(
             optimizer.step()
             epoch_loss += loss.item()
 
-        print(
-            f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss/len(train_loader):.4f}"
-        )
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss/len(train_loader):.4f}")
 
-    # Save the model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
@@ -142,7 +111,6 @@ def train_ffnn(
     learning_rate=0.001,
     model_save_path="model/risk.pth",
 ):
-    # Check for GPU (ROCm)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if torch.cuda.is_available():
@@ -150,39 +118,29 @@ def train_ffnn(
     else:
         print("No GPU detected. Using CPU.")
 
-    # Load data
-    X_train, X_val, X_test, y_train, y_val, y_test = load_dataset(
-        data_path, features, label
-    )
+    X_train, X_val, X_test, y_train, y_val, y_test = load_dataset(data_path, features, label)
     train_dataset = HealthDataset(X_train, y_train)
     val_dataset = HealthDataset(X_val, y_val)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    # Initialize model and move to GPU
     model = FFNNModel(input_size=len(features)).to(device)
 
-    # Loss and optimizer
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Training loop
     for epoch in range(num_epochs):
-        # Training phase
         model.train()
         for X_batch, y_batch in train_loader:
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
 
-            # Forward pass
             outputs = model(X_batch).squeeze()
             loss = criterion(outputs, y_batch)
 
-            # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        # Validation phase
         model.eval()
         val_loss = 0
         with torch.no_grad():
@@ -193,11 +151,8 @@ def train_ffnn(
                 val_loss += loss.item()
 
         val_loss /= len(val_loader)
-        print(
-            f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss:.6f}"
-        )
+        print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss:.6f}")
 
-    # Save the trained model
     os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
     torch.save(model.state_dict(), model_save_path)
     print(f"Model saved to {model_save_path}")

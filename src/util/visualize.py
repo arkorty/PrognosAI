@@ -13,10 +13,12 @@ def visualize_ffnn(conf_matrix, fpr, tpr, roc_auc, output_dir=None):
         conf_matrix,
         annot=True,
         fmt="d",
-        cmap="YlGnBu",
+        cmap="Greys",
         xticklabels=["Low", "High"],
         yticklabels=["Low", "High"],
         cbar_kws={"label": "Count"},
+        linewidths=0.5,
+        linecolor="gray",
     )
     plt.title("Confusion Matrix")
     plt.xlabel("Predicted")
@@ -26,39 +28,27 @@ def visualize_ffnn(conf_matrix, fpr, tpr, roc_auc, output_dir=None):
     print(f"Confusion matrix saved to {filename}")
 
     plt.figure(figsize=(8, 6))
-    plt.plot(
-        fpr, tpr, color="darkorange", lw=2, label=f"ROC curve (AUC = {roc_auc:.2f})"
-    )
-    plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+    plt.plot(fpr, tpr, color="blue", lw=2, label=f"ROC curve (AUC = {roc_auc:.2f})")
+    plt.plot([0, 1], [0, 1], color="lightgray", lw=2, linestyle="--")
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
     plt.title("Receiver Operating Characteristic")
     plt.legend(loc="lower right")
-    plt.savefig(os.path.join(output_dir, "roc_curve.png"), bbox_inches="tight", dpi=300)
+    filename = os.path.join(output_dir, "roc_curve.png")
+    plt.savefig(filename, bbox_inches="tight", dpi=300)
     print(f"ROC curve saved to {filename}")
 
 
 def summarize_dataset(data, label_column, output_dir):
-    """
-    Print summary statistics and save key information about the dataset as plots.
-
-    Args:
-        data (DataFrame): The dataset to summarize.
-        label_column (str): The column name of the target label.
-        output_dir (str): Directory to save the plots.
-    """
     print("Dataset Overview:")
     print(data.info())
     print("\nSummary Statistics:")
     print(data.describe())
 
-    # Display class distribution
     plt.figure(figsize=(8, 6))
-    data[label_column].value_counts().plot(
-        kind="bar", color=["#1f77b4", "#ff7f0e", "#2ca02c"]
-    )
+    data[label_column].value_counts().plot(kind="bar", color=["#8c8c8c", "#bfbfbf", "#d9d9d9"])
     plt.title("Class Distribution")
     plt.xlabel("Risk Category")
     plt.ylabel("Count")
@@ -68,28 +58,19 @@ def summarize_dataset(data, label_column, output_dir):
 
 
 def plot_feature_distributions(data, features, output_dir):
-    """
-    Save histograms and KDE plots for each feature in the dataset.
-
-    Args:
-        data (DataFrame): The dataset containing features.
-        features (list): List of feature column names.
-        output_dir (str): Directory to save the plots.
-    """
     num_features = len(features)
     n_cols = 3
-    n_rows = (num_features + n_cols - 1) // n_cols  # Round up for rows
+    n_rows = (num_features + n_cols - 1) // n_cols
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows * 5))
     axes = axes.flatten()
 
     for i, feature in enumerate(features):
-        sns.histplot(data[feature], kde=True, ax=axes[i], color="#1f77b4")
+        sns.histplot(data[feature], kde=True, ax=axes[i], color="#808080")
         axes[i].set_title(f"Distribution of {feature}")
         axes[i].set_xlabel(feature)
         axes[i].set_ylabel("Frequency")
 
-    # Turn off unused subplots
     for j in range(len(features), len(axes)):
         axes[j].axis("off")
 
@@ -99,23 +80,17 @@ def plot_feature_distributions(data, features, output_dir):
 
 
 def plot_correlation_matrix(data, features, output_dir):
-    """
-    Save a heatmap of the correlation matrix for the dataset.
-
-    Args:
-        data (DataFrame): The dataset containing features.
-        features (list): List of feature column names.
-        output_dir (str): Directory to save the plot.
-    """
     plt.figure(figsize=(12, 8))
     correlation_matrix = data[features].corr()
     sns.heatmap(
         correlation_matrix,
         annot=True,
         fmt=".2f",
-        cmap="coolwarm",
+        cmap="Greys",
         cbar=True,
         square=True,
+        linecolor="gray",
+        linewidths=0.5,
     )
     plt.title("Feature Correlation Matrix")
     plt.savefig(os.path.join(output_dir, "correlation_matrix.png"))
@@ -123,36 +98,18 @@ def plot_correlation_matrix(data, features, output_dir):
 
 
 def pairplot_features(data, features, label_column, output_dir):
-    """
-    Save pairwise scatterplots for features with hue as the label column.
-
-    Args:
-        data (DataFrame): The dataset containing features and labels.
-        features (list): List of feature column names.
-        label_column (str): The column name of the target label.
-        output_dir (str): Directory to save the plot.
-    """
-    pairplot = sns.pairplot(
-        data[features + [label_column]], hue=label_column, palette="husl"
-    )
+    pairplot = sns.pairplot(data[features + [label_column]], hue=label_column, palette="gray")
     pairplot.savefig(os.path.join(output_dir, "pairplot_features.png"))
     plt.close()
 
 
 def check_missing_values(data, output_dir):
-    """
-    Display the count of missing values for each column and save the plot.
-
-    Args:
-        data (DataFrame): The dataset to analyze for missing values.
-        output_dir (str): Directory to save the plot.
-    """
     missing_values = data.isnull().sum()
     print("\nMissing Values:")
     print(missing_values[missing_values > 0])
     if missing_values.any():
         plt.figure(figsize=(10, 6))
-        missing_values[missing_values > 0].plot(kind="bar", color="#d62728")
+        missing_values[missing_values > 0].plot(kind="bar", color="#a6a6a6")
         plt.title("Missing Values Count by Column")
         plt.xlabel("Columns")
         plt.ylabel("Missing Count")
@@ -163,24 +120,11 @@ def check_missing_values(data, output_dir):
 
 
 def visualize_data(data_path, features, label_column, output_dir):
-    """
-    Complete visualization workflow for the dataset.
-
-    Args:
-        data_path (str): Path to the CSV file.
-        features (list): List of feature column names.
-        label_column (str): The column name of the target label.
-        output_dir (str): Directory to save the plots.
-    """
-    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load the dataset
     data = pd.read_csv(data_path)
 
-    # Run visualizations
     summarize_dataset(data, label_column, output_dir)
     plot_feature_distributions(data, features, output_dir)
     plot_correlation_matrix(data, features, output_dir)
-    # pairplot_features(data, features, label_column, output_dir)
     check_missing_values(data, output_dir)
