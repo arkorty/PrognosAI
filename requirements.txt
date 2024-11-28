@@ -4,3 +4,5 @@ pandas
 numpy
 colorama
 tabulate
+matplotlib
+seaborn
