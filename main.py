@@ -1,10 +1,8 @@
 import argparse
 import pandas as pd
-import torch
 import sys
 from src.train import train_ffnn
 from src.train import train_rnn
-from src.model.ffnn import FFNNModel
 from src.predict import predict_risk
 from src.predict import predict_pressure
 from src.util.evaluate import evaluate_ffnn

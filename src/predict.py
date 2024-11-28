@@ -4,7 +4,6 @@ from src.util.preprocess.pressure import preprocess_data
 from src.model.ffnn import FFNNModel
 from src.model.rnn import RNNModel
 import torch
-import random
 
 
 def predict_pressure(model, data_path, samples=10):

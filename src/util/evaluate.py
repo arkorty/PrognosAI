@@ -1,4 +1,3 @@
-import os
 import torch
 from sklearn.metrics import (
     accuracy_score,
@@ -9,9 +8,6 @@ from sklearn.metrics import (
     roc_curve,
     auc,
 )
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 
 
 def evaluate_ffnn(model, X_test, y_test):
